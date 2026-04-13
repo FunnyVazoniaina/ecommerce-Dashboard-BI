@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import {
+  Area,
+  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
@@ -64,6 +66,7 @@ const normalizeTopProducts = (rows = []) =>
 const normalizeSalesByCity = (rows = []) =>
   rows.map((row) => ({
     city: row.city || "Ville inconnue",
+    total_sales: Number(row.total_sales) || 0,
     total_revenue: Number(row.total_revenue) || 0,
   }));
 
@@ -88,6 +91,15 @@ const normalizeHighlights = (row = {}) => ({
 const normalizeForecast = (row = {}) => ({
   forecast_revenue: Number(row.forecast_revenue) || 0,
   recent_growth_rate: Number(row.recent_growth_rate) || 0,
+});
+
+const normalizeRecommendations = (row = {}) => ({
+  least_product_name: row.least_product_name || "Produit inconnu",
+  least_product_quantity: Number(row.least_product_quantity) || 0,
+  least_product_revenue: Number(row.least_product_revenue) || 0,
+  least_city_name: row.least_city_name || "Ville inconnue",
+  least_city_quantity: Number(row.least_city_quantity) || 0,
+  least_city_revenue: Number(row.least_city_revenue) || 0,
 });
 
 function Bloc({ title, action, children, className = "" }) {
@@ -151,9 +163,9 @@ function TooltipCard({ active, payload, label, formatter = formatCurrency }) {
   );
 }
 
-function LigneClassement({ index, label, value, color }) {
+function LigneClassement({ index, label, value, salesCount, color }) {
   return (
-    <div className="grid grid-cols-[22px_1fr_auto] items-center gap-2 border-b border-white/5 py-1.5 last:border-b-0">
+    <div className="grid grid-cols-[22px_1fr_auto_auto] items-center gap-2 border-b border-white/5 py-1.5 last:border-b-0">
       <div
         className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold text-white"
         style={{ backgroundColor: color }}
@@ -161,6 +173,9 @@ function LigneClassement({ index, label, value, color }) {
         {index + 1}
       </div>
       <p className="truncate text-xs text-slate-300">{label}</p>
+      <p className="text-right text-xs text-slate-400">
+        {formatNumber(salesCount)} ventes
+      </p>
       <p className="text-xs font-semibold text-white">{formatCurrency(value)}</p>
     </div>
   );
@@ -171,7 +186,9 @@ function LigneMensuelle({ label, revenue, sales }) {
     <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2 border-b border-white/5 py-1.5 last:border-b-0">
       <p className="text-xs text-slate-300">{label}</p>
       <p className="text-xs font-semibold text-white">{formatCurrency(revenue)}</p>
-      <p className="text-right text-xs text-slate-400">{formatNumber(sales)}</p>
+      <p className="text-right text-xs text-slate-400">
+        {formatNumber(sales)} ventes
+      </p>
     </div>
   );
 }
@@ -197,47 +214,6 @@ function SelectFiltre({ label, value, onChange, options }) {
   );
 }
 
-function Jauge({ titre, value, max = 1000, accent, sousTitre }) {
-  const safeValue = Number(value) || 0;
-  const remainder = Math.max(max - safeValue, 0);
-  const data = [
-    { name: "value", value: safeValue, fill: accent },
-    { name: "rest", value: remainder, fill: "#26304e" },
-  ];
-
-  return (
-    <Bloc title={titre}>
-      <div className="h-[104px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={data}
-              dataKey="value"
-              startAngle={220}
-              endAngle={-40}
-              innerRadius={28}
-              outerRadius={40}
-              stroke="none"
-              paddingAngle={3}
-            >
-              {data.map((entry) => (
-                <Cell key={entry.name} fill={entry.fill} />
-              ))}
-            </Pie>
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
-      <div className="-mt-18 text-center">
-        <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">
-          Score
-        </p>
-        <p className="mt-1 text-xl font-bold text-white">{safeValue}</p>
-        <p className="mt-1 text-xs text-slate-400">{sousTitre}</p>
-      </div>
-    </Bloc>
-  );
-}
-
 function App() {
   const [overview, setOverview] = useState(null);
   const [highlights, setHighlights] = useState(null);
@@ -246,6 +222,7 @@ function App() {
   const [salesByCity, setSalesByCity] = useState([]);
   const [salesByCategory, setSalesByCategory] = useState([]);
   const [forecast, setForecast] = useState(null);
+  const [recommendations, setRecommendations] = useState(null);
   const [periodSales, setPeriodSales] = useState([]);
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
@@ -259,6 +236,7 @@ function App() {
         api.get("/kpis/highlights"),
         api.get("/filters/sales-by-category"),
         api.get("/advanced/forecast"),
+        api.get("/advanced/recommendations"),
         api.get("/charts/sales-by-month"),
         api.get("/charts/top-products"),
         api.get("/charts/sales-by-city"),
@@ -269,6 +247,7 @@ function App() {
         highlightsRes,
         salesByCategoryRes,
         forecastRes,
+        recommendationsRes,
         salesMonthRes,
         topProductsRes,
         salesCityRes,
@@ -283,6 +262,9 @@ function App() {
       }
       if (forecastRes.status === "fulfilled") {
         setForecast(normalizeForecast(forecastRes.value.data.data));
+      }
+      if (recommendationsRes.status === "fulfilled") {
+        setRecommendations(normalizeRecommendations(recommendationsRes.value.data.data));
       }
       if (salesMonthRes.status === "fulfilled") {
         const normalized = normalizeMonthlySales(salesMonthRes.value.data.data);
@@ -335,10 +317,6 @@ function App() {
   const itemsSold = overview?.total_items_sold ?? 0;
   const salesRows = overview?.total_sales_rows ?? 0;
   const averageBasket = salesRows ? revenue / salesRows : 0;
-  const trendUp =
-    salesByMonth.length > 1 &&
-    Number(salesByMonth.at(-1)?.total_revenue) >
-      Number(salesByMonth.at(-2)?.total_revenue);
   const bestMonth = salesByMonth.reduce(
     (best, current) =>
       current.total_revenue > best.total_revenue ? current : best,
@@ -346,6 +324,9 @@ function App() {
   );
   const rankedProducts = topProducts.slice(0, 4);
   const rankedCities = salesByCity.slice(0, 4);
+  const citySalesVolume = [...salesByCity]
+    .sort((a, b) => b.total_sales - a.total_sales)
+    .slice(0, 6);
   const monthlySalesList = salesByMonth
     .slice(-4)
     .reverse()
@@ -360,14 +341,10 @@ function App() {
   }));
   const periodRevenue = periodSales.reduce((sum, item) => sum + item.total_revenue, 0);
   const periodTransactions = periodSales.reduce((sum, item) => sum + item.total_sales, 0);
-  const topCategories = salesByCategory.slice(0, 3);
+  const allCategories = salesByCategory;
   const displayBestMonth =
     monthLabels[highlights?.best_month_number] || bestMonth.month;
-  const scoreSynthese = Math.min(
-    1000,
-    Math.round((forecast?.forecast_revenue || averageBasket || 0) / 100),
-  );
-  const categoryPieData = topCategories.map((item, index) => ({
+  const categoryPieData = allCategories.map((item, index) => ({
     name: item.category,
     value: item.total_revenue,
     fill: chartPalette[index % chartPalette.length],
@@ -403,15 +380,6 @@ function App() {
                   Data<span className="text-[#b05cff]">Vue</span>
                 </p>
                 <p className="mt-1 text-[11px] text-slate-400">Pilotage</p>
-              </div>
-              <div className="h-10 w-px bg-white/10" />
-              <div>
-                <p className="text-sm font-semibold text-white">
-                  Tableau de bord analytique
-                </p>
-                <p className="mt-1 text-xs text-slate-400">
-                  Suivi des ventes, produits, villes et indicateurs avances.
-                </p>
               </div>
             </div>
             <div className="flex justify-end">
@@ -532,14 +500,19 @@ function App() {
                       Categories
                     </p>
                     <p className="mt-1 text-lg font-bold text-white">
-                      {topCategories.length}
+                      {allCategories.length}
                     </p>
                   </div>
-                  <div className="mt-2 space-y-1">
-                    {topCategories.map((category, index) => (
+                  <div className="mt-2 grid grid-cols-[1fr_auto_auto] gap-2 text-[11px] uppercase tracking-[0.16em] text-slate-500">
+                    <p>Categorie</p>
+                    <p className="text-right"></p>
+                    <p className="text-right">Chiffre d'affaires</p>
+                  </div>
+                  <div className="mt-2 max-h-[164px] space-y-1 overflow-y-auto pr-1">
+                    {allCategories.map((category, index) => (
                       <div
                         key={category.category}
-                        className="flex items-center justify-between text-xs"
+                        className="grid grid-cols-[1fr_auto_auto] items-center gap-2 text-xs"
                       >
                         <div className="flex items-center gap-2 text-slate-300">
                           <span
@@ -551,6 +524,9 @@ function App() {
                           />
                           {category.category}
                         </div>
+                        <span className="text-right text-slate-400">
+                          {formatNumber(category.total_sales)} ventes
+                        </span>
                         <span className="text-white">
                           {formatCurrency(category.total_revenue)}
                         </span>
@@ -607,10 +583,13 @@ function App() {
 
                   <div className="grid gap-2 xl:grid-cols-[0.9fr_1.1fr]">
                     <div>
+                      <p className="mb-2 text-[11px] uppercase tracking-[0.16em] text-slate-500">
+                        Evolution des 4 derniers mois
+                      </p>
                       <div className="mb-2 grid grid-cols-[1fr_auto_auto] gap-2 text-[11px] uppercase tracking-[0.16em] text-slate-500">
-                        <p>Mois</p>
-                        <p>Montant</p>
-                        <p className="text-right">Nb</p>
+                        <p>Mois observe</p>
+                        <p></p>
+                        <p className="text-right">Nombre de ventes</p>
                       </div>
                       {monthlySalesList.map((month) => (
                         <LigneMensuelle
@@ -623,14 +602,20 @@ function App() {
                     </div>
                     <div>
                       <p className="mb-2 text-[11px] uppercase tracking-[0.16em] text-slate-500">
-                        Produits
+                        Top 4 des produits par chiffre d'affaires
                       </p>
+                      <div className="mb-2 grid grid-cols-[1fr_auto_auto] gap-2 text-[11px] uppercase tracking-[0.16em] text-slate-500">
+                        <p>Produit</p>
+                        <p className="text-right"></p>
+                        <p className="text-right">Chiffre d'affaires</p>
+                      </div>
                       {rankedProducts.map((product, index) => (
                         <LigneClassement
                           key={`${product.name}-${index}`}
                           index={index}
                           label={product.name}
                           value={product.total_revenue}
+                          salesCount={product.total_quantity}
                           color={chartPalette[index % chartPalette.length]}
                         />
                       ))}
@@ -641,13 +626,111 @@ function App() {
             </div>
 
             <div className="grid min-h-0 auto-rows-min gap-2">
-              <Jauge
-                titre="Score de synthese"
-                value={scoreSynthese}
-                max={1000}
-                accent="#ff8f3d"
-                sousTitre={trendUp ? "Niveau eleve" : "Niveau moyen"}
-              />
+              <Bloc
+                title="Nombre de ventes par ville"
+              >
+                <div className="h-[104px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={citySalesVolume}
+                      margin={{ top: 8, right: 8, left: 6, bottom: 0 }}
+                    >
+                      <defs>
+                        <linearGradient id="citySalesSurface" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#ff9b50" stopOpacity={0.65} />
+                          <stop offset="55%" stopColor="#ff4d9d" stopOpacity={0.28} />
+                          <stop offset="100%" stopColor="#2f80ff" stopOpacity={0.04} />
+                        </linearGradient>
+                        <linearGradient id="citySalesGlow" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor="#ff8f3d" />
+                          <stop offset="50%" stopColor="#ff4d9d" />
+                          <stop offset="100%" stopColor="#2f80ff" />
+                        </linearGradient>
+                        <linearGradient id="citySalesShadow" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor="#7a3cff" />
+                          <stop offset="100%" stopColor="#123f8f" />
+                        </linearGradient>
+                        <filter id="citySalesDepth" x="-20%" y="-20%" width="140%" height="160%">
+                          <feDropShadow
+                            dx="0"
+                            dy="8"
+                            stdDeviation="8"
+                            floodColor="#050816"
+                            floodOpacity="0.55"
+                          />
+                        </filter>
+                      </defs>
+                      <CartesianGrid stroke="#202845" vertical={false} strokeDasharray="4 4" />
+                      <XAxis
+                        dataKey="city"
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{ fill: "#7f8cb0", fontSize: 10 }}
+                      />
+                      <YAxis
+                        tickLine={false}
+                        axisLine={false}
+                        width={60}
+                        tick={{ fill: "#7f8cb0", fontSize: 10 }}
+                        tickFormatter={(value) => formatNumber(value)}
+                      />
+                      <Tooltip
+                        content={
+                          <TooltipCard formatter={(value) => formatNumber(value)} />
+                        }
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="total_sales"
+                        stroke="none"
+                        fill="url(#citySalesSurface)"
+                        fillOpacity={1}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="total_sales"
+                        stroke="url(#citySalesShadow)"
+                        strokeWidth={8}
+                        strokeOpacity={0.25}
+                        dot={false}
+                        activeDot={false}
+                        filter="url(#citySalesDepth)"
+                      />
+                      <Line
+                        dataKey="total_sales"
+                        type="monotone"
+                        stroke="url(#citySalesGlow)"
+                        strokeWidth={3}
+                        dot={{
+                          r: 3.5,
+                          fill: "#0f1528",
+                          stroke: "#ffb26d",
+                          strokeWidth: 2,
+                        }}
+                        activeDot={{
+                          r: 6,
+                          stroke: "#0f1528",
+                          strokeWidth: 2,
+                          fill: "#ff8f3d",
+                        }}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="mt-2 space-y-1">
+                  {citySalesVolume.slice(0, 3).map((city) => (
+                    <div
+                      key={`city-sales-${city.city}`}
+                      className="flex items-center justify-between text-xs text-slate-300"
+                    >
+                      <span className="truncate">{city.city}</span>
+                      <span className="font-semibold text-white">
+                        {formatNumber(city.total_sales)} ventes
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </Bloc>
 
               <Bloc title="Highlights">
                 <div className="grid gap-2">
@@ -702,7 +785,7 @@ function App() {
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     <MiniCarte
-                      label="CA periode"
+                      label="Chiffre d'affaires "
                       value={formatCurrency(periodRevenue)}
                       detail={`${formatNumber(periodTransactions)} ventes`}
                       color="#0f766e"
@@ -732,20 +815,24 @@ function App() {
                       color="#b05cff"
                     />
                     <MiniCarte
-                      label="Produit leader"
-                      value={rankedProducts[0]?.name || "Produit inconnu"}
+                      label="Produit le moins achete"
+                      value={recommendations?.least_product_name || "Produit inconnu"}
                       detail={`${formatNumber(
-                        rankedProducts[0]?.total_quantity || 0,
-                      )} articles vendus`}
-                      color="#ff4d9d"
+                        recommendations?.least_product_quantity || 0,
+                      )} articles | ${formatCurrency(
+                        recommendations?.least_product_revenue || 0,
+                      )}`}
+                      color="#6d7bff"
                     />
                     <MiniCarte
-                      label="Client principal"
-                      value={highlights?.top_city_name || "Ville inconnue"}
-                      detail={formatCurrency(
-                        highlights?.top_city_revenue || 0,
-                      )}
-                      color="#6d7bff"
+                      label="Ville qui consomme le moins"
+                      value={recommendations?.least_city_name || "Ville inconnue"}
+                      detail={`${formatNumber(
+                        recommendations?.least_city_quantity || 0,
+                      )} articles | ${formatCurrency(
+                        recommendations?.least_city_revenue || 0,
+                      )}`}
+                      color="#4f8dfd"
                     />
                   </div>
                 </div>

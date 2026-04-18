@@ -241,6 +241,7 @@ exports.getForecast = async (_req, res) => {
         SELECT
           dt.year,
           dt.month,
+          COUNT(*) AS total_sales,
           SUM(fs.total) AS total_revenue
         FROM fact_sales fs
         JOIN dim_time dt ON fs.time_id = dt.id
@@ -267,6 +268,7 @@ exports.getForecast = async (_req, res) => {
       )
       SELECT
         COALESCE((SELECT ROUND(AVG(total_revenue)) FROM latest_three), 0) AS forecast_revenue,
+        COALESCE((SELECT ROUND(AVG(total_sales)) FROM latest_three), 0) AS forecast_sales_count,
         COALESCE((SELECT year FROM current_month), 0) AS current_year,
         COALESCE((SELECT month FROM current_month), 0) AS current_month,
         COALESCE((
@@ -278,7 +280,17 @@ exports.getForecast = async (_req, res) => {
             2
           )
           FROM latest_two
-        ), 0) AS recent_growth_rate;
+        ), 0) AS recent_growth_rate,
+        COALESCE((
+          SELECT ROUND(
+            (
+              (MAX(total_sales) - MIN(total_sales))::numeric /
+              NULLIF(MIN(total_sales), 0)
+            ) * 100,
+            2
+          )
+          FROM latest_two
+        ), 0) AS sales_growth_rate;
     `;
 
     const { rows } = await pool.query(query);

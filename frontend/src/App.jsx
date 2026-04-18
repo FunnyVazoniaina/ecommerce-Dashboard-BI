@@ -138,14 +138,18 @@ function CarteKpi({ titre, valeur, sousTitre, couleur }) {
   );
 }
 
-function MiniCarte({ label, value, detail, color }) {
+function MiniCarte({ label, value, detail, color, className = "" }) {
   return (
-    <div className="rounded-[16px] border border-white/5 bg-[#1a2240] p-2">
+    <div
+      className={`rounded-[16px] border border-white/5 bg-[#1a2240] px-2.5 py-2 ${className}`}
+    >
       <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">
         {label}
       </p>
-      <p className="mt-1 text-sm font-semibold text-white">{value}</p>
-      <p className="mt-1 text-[11px]" style={{ color }}>
+      <p className="mt-0.5 text-sm font-semibold leading-tight text-white">
+        {value}
+      </p>
+      <p className="mt-0.5 text-[11px] leading-tight" style={{ color }}>
         {detail}
       </p>
     </div>
@@ -206,7 +210,7 @@ function SelectFiltre({ label, value, onChange, options }) {
       <select
         value={value}
         onChange={onChange}
-        className="w-full rounded-2xl border border-white/8 bg-[#0e1428] px-3 py-2 text-xs text-slate-200 outline-none focus:border-[#9b5cff]"
+        className="w-full rounded-2xl border border-white/8 bg-[#0e1428] px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-[#9b5cff]"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -387,9 +391,9 @@ function App() {
   }
 
   return (
-    <main className="h-screen overflow-hidden bg-[#090f1d] text-white">
-      <div className="h-screen p-3">
-        <section className="flex h-full min-h-0 flex-col gap-2 overflow-hidden rounded-[34px] border border-white/5 bg-[#0f1528] p-4 shadow-[0_25px_70px_rgba(0,0,0,0.32)]">
+    <main className="min-h-screen overflow-y-auto bg-[#090f1d] text-white xl:h-screen xl:overflow-hidden">
+      <div className="min-h-screen p-3 xl:h-screen">
+        <section className="flex min-h-full flex-col gap-2 overflow-visible rounded-[34px] border border-white/5 bg-[#0f1528] p-4 shadow-[0_25px_70px_rgba(0,0,0,0.32)] xl:h-full xl:min-h-0 xl:overflow-hidden">
           <header className="grid gap-3 lg:grid-cols-[1fr_210px] lg:items-center">
             <div className="flex items-center gap-4">
               <div>
@@ -453,11 +457,7 @@ function App() {
               <div className="grid min-h-0 gap-2 xl:grid-cols-[1.28fr_0.72fr]">
                 <Bloc
                   title="Evolution mensuelle"
-                  action={
-                    <span className="rounded-full bg-[#1a2240] px-3 py-1 text-[11px] text-slate-300">
-                      Annuel
-                    </span>
-                  }
+                  
                 >
                   <div className="h-[164px]">
                     <ResponsiveContainer width="100%" height="100%">
@@ -642,7 +642,7 @@ function App() {
               </Bloc>
             </div>
 
-            <div className="grid min-h-0 auto-rows-min gap-2">
+            <div className="grid min-h-0 auto-rows-min content-start gap-2">
               <Bloc
                 title="Nombre de ventes par ville"
               >
@@ -750,7 +750,7 @@ function App() {
               </Bloc>
 
               <Bloc title="Highlights">
-                <div className="grid gap-2">
+                <div className="grid gap-1.5 sm:grid-cols-3">
                   <MiniCarte
                     label="Produit leader"
                     value={highlights?.top_product_name || "-"}
@@ -785,8 +785,8 @@ function App() {
               </Bloc>
 
               <Bloc title="Filtres et previsions">
-                <div className="grid gap-2">
-                  <div className="grid gap-2 sm:grid-cols-2">
+                <div className="grid gap-3">
+                  <div className="grid gap-1.5 sm:grid-cols-2">
                     <SelectFiltre
                       label="Debut"
                       value={periodStart}
@@ -800,30 +800,50 @@ function App() {
                       options={periodOptions}
                     />
                   </div>
+                  <div className="rounded-[18px] border border-white/5 bg-[#18203b] p-3">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">
+                          Predictions
+                        </p>
+                        <h3 className="mt-1 text-sm font-semibold text-white">
+                          Previsions du prochain mois
+                        </h3>
+                      </div>
+                      <span className="rounded-full bg-[#0f1528] px-3 py-1 text-[11px] text-slate-300">
+                        {forecastPeriodLabel}
+                      </span>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <MiniCarte
+                        label="Chiffre d'affaires prevu"
+                        value={formatCurrency(forecast?.forecast_revenue || 0)}
+                        detail={`Evolution recente: ${formatPercent(
+                          forecast?.recent_growth_rate || 0,
+                        )}`}
+                        color="#ff8f3d"
+                        className="px-3 py-3"
+                      />
+                      <MiniCarte
+                        label="Ventes prevues"
+                        value={`${formatNumber(
+                          forecast?.forecast_sales_count || 0,
+                        )} ventes`}
+                        detail={`Evolution recente: ${formatPercent(
+                          forecast?.sales_growth_rate || 0,
+                        )}`}
+                        color="#14b8a6"
+                        className="px-3 py-3"
+                      />
+                    </div>
+                  </div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     <MiniCarte
-                      label="Chiffre d'affaires "
+                      label="Periode selectionnee"
                       value={formatCurrency(periodRevenue)}
                       detail={`${formatNumber(periodTransactions)} ventes`}
                       color="#0f766e"
-                    />
-                    <MiniCarte
-                      label="Prevision CA"
-                      value={formatCurrency(forecast?.forecast_revenue || 0)}
-                      detail={`${forecastPeriodLabel} | ${formatPercent(
-                        forecast?.recent_growth_rate || 0,
-                      )}`}
-                      color="#ff8f3d"
-                    />
-                    <MiniCarte
-                      label="Prevision ventes"
-                      value={`${formatNumber(
-                        forecast?.forecast_sales_count || 0,
-                      )} ventes`}
-                      detail={`${forecastPeriodLabel} | ${formatPercent(
-                        forecast?.sales_growth_rate || 0,
-                      )}`}
-                      color="#14b8a6"
+                      className="min-h-[78px]"
                     />
                     <MiniCarte
                       label="Poids du top produit"
@@ -832,6 +852,7 @@ function App() {
                         rankedProducts[0]?.total_revenue || 0,
                       )}
                       color="#2f80ff"
+                      className="min-h-[78px]"
                     />
                     <MiniCarte
                       label="Poids de la ville leader"
@@ -840,6 +861,7 @@ function App() {
                         highlights?.top_city_revenue || 0,
                       )}
                       color="#b05cff"
+                      className="min-h-[78px]"
                     />
                     <MiniCarte
                       label="Produit le moins achete"
@@ -850,6 +872,7 @@ function App() {
                         recommendations?.least_product_revenue || 0,
                       )}`}
                       color="#6d7bff"
+                      className="min-h-[78px]"
                     />
                     <MiniCarte
                       label="Ville qui consomme le moins"
@@ -860,6 +883,7 @@ function App() {
                         recommendations?.least_city_revenue || 0,
                       )}`}
                       color="#4f8dfd"
+                      className="min-h-[78px] sm:col-span-2"
                     />
                   </div>
                 </div>

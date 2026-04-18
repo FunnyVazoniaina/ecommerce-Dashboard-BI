@@ -90,7 +90,11 @@ const normalizeHighlights = (row = {}) => ({
 
 const normalizeForecast = (row = {}) => ({
   forecast_revenue: Number(row.forecast_revenue) || 0,
+  forecast_sales_count: Number(row.forecast_sales_count) || 0,
+  current_year: Number(row.current_year) || 0,
+  current_month: Number(row.current_month) || 0,
   recent_growth_rate: Number(row.recent_growth_rate) || 0,
+  sales_growth_rate: Number(row.sales_growth_rate) || 0,
 });
 
 const normalizeRecommendations = (row = {}) => ({
@@ -355,6 +359,19 @@ function App() {
   const topCityShare = revenue
     ? ((highlights?.top_city_revenue || 0) / revenue) * 100
     : 0;
+  const nextForecastMonthNumber = forecast?.current_month
+    ? forecast.current_month === 12
+      ? 1
+      : forecast.current_month + 1
+    : 0;
+  const nextForecastYear = forecast?.current_year
+    ? forecast.current_month === 12
+      ? forecast.current_year + 1
+      : forecast.current_year
+    : 0;
+  const forecastPeriodLabel = nextForecastMonthNumber
+    ? `${monthLabels[nextForecastMonthNumber]} ${nextForecastYear}`
+    : "Prochain mois";
 
   if (loading) {
     return (
@@ -791,12 +808,22 @@ function App() {
                       color="#0f766e"
                     />
                     <MiniCarte
-                      label="Prevision"
+                      label="Prevision CA"
                       value={formatCurrency(forecast?.forecast_revenue || 0)}
-                      detail={`Croissance: ${formatNumber(
+                      detail={`${forecastPeriodLabel} | ${formatPercent(
                         forecast?.recent_growth_rate || 0,
-                      )}%`}
+                      )}`}
                       color="#ff8f3d"
+                    />
+                    <MiniCarte
+                      label="Prevision ventes"
+                      value={`${formatNumber(
+                        forecast?.forecast_sales_count || 0,
+                      )} ventes`}
+                      detail={`${forecastPeriodLabel} | ${formatPercent(
+                        forecast?.sales_growth_rate || 0,
+                      )}`}
+                      color="#14b8a6"
                     />
                     <MiniCarte
                       label="Poids du top produit"
